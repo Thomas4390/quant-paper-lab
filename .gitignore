@@ -12,3 +12,7 @@ out/
 
 .streamlit/secrets.toml
 .DS_Store
+
+# IDE
+.idea/
+.vscode/
