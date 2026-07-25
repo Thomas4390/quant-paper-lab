@@ -11,8 +11,8 @@
       "year": 1993,
       "paper_url": "https://doi.org/10.1111/j.1540-6261.1993.tb04702.x",
       "app_url": "https://quant-paper-lab.streamlit.app/momentum-1993",
-      "one_liner": "Stocks that beat the market over the past year kept beating it over the following months. The result held for decades, then stopped paying the way it used to.",
-      "quotable": "Sorting stocks on their prior year of returns earned 1.63 percent a month over the sample in the original paper, and 0.16 percent a month since 2009."
+      "one_liner": "Stocks that beat the market over the past year kept beating it over the following months. Reproduced on the paper's own weighting, the result comes back within 0.03 points of the published number. What happened after 2009 is a harder question than it looks.",
+      "quotable": "Reproducing Jegadeesh and Titman on equal weighted deciles gives 1.33 percent a month over their 1965 to 1989 sample, against the 1.31 percent they published."
     }
   ]
 }

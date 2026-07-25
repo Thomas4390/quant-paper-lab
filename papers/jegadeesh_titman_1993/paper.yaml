@@ -11,45 +11,81 @@ url: https://doi.org/10.1111/j.1540-6261.1993.tb04702.x
 # Date the LinkedIn post goes out. Set it when the post is scheduled, because the manifest
 # read by linkedin-connector only exports papers that have one.
 published: 2026-07-25
+
 one_liner: >-
   Stocks that beat the market over the past year kept beating it over the following months.
-  The result held for decades, then stopped paying the way it used to.
+  Reproduced on the paper's own weighting, the result comes back within 0.03 points of the
+  published number. What happened after 2009 is a harder question than it looks.
 
 # One sentence linkedin-connector can drop into a message. Written to stand alone.
 quotable: >-
-  Sorting stocks on their prior year of returns earned 1.63 percent a month over the sample
-  in the original paper, and 0.16 percent a month since 2009.
+  Reproducing Jegadeesh and Titman on equal weighted deciles gives 1.33 percent a month over
+  their 1965 to 1989 sample, against the 1.31 percent they published.
 
 data_sources:
   - name: Kenneth R. French Data Library
     url: https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
     licence: public, free
 
-# Every claim the post makes has to be checkable here, against a figure in the app or a
-# page of the paper. Numbers come from the reproduction, not from memory.
+# Every number that appears in the post has to be here, tied to the thing in the app that
+# shows it. Claims are written before the figures, and `evidence` has to name something the
+# reader can actually look at. A claim whose number appears nowhere is not a claim.
 claims:
-  - claim: Sorting on the prior 2 to 12 month return earned 1.63 percent a month over the
-      paper's own 1965 to 1989 window, top decile minus bottom decile.
-    evidence: figure_decile_fan
-  - claim: The sign of the effect depends entirely on the formation horizon. Prior 1 month
-      reverses at minus 0.78 percent a month, prior 13 to 60 months reverses at minus 0.42
-      percent, prior 2 to 12 months continues at plus 1.15 percent, all full sample.
-    evidence: figure_decile_fan
-  - claim: The tilt toward past winners is present in every size quintile and is weakest
-      among the largest stocks, 0.59 percent a month versus 0.88 for the smallest.
+  - claim: On equal weighted deciles, the construction the paper used, the top minus bottom
+      decile spread is 1.33 percent a month over the paper's own 1965 to 1989 sample (t 4.80),
+      against the 1.31 percent they published. Value weighted gives 1.63 percent (t 5.12).
+    evidence: stat_tiles, with the weighting control
+  - claim: The sign of the effect depends on the formation horizon. On the common 1931 to 2026
+      sample, prior 1 month reverses at minus 0.85 percent a month (t -4.63), prior 2 to 12
+      months continues at plus 1.03 percent (t 4.39), prior 13 to 60 months reverses at minus
+      0.42 percent (t -2.24).
+    evidence: stat_tiles, with the horizon control
+  - claim: The one month reversal is a pre-1990 phenomenon. It has had the opposite sign since,
+      at plus 0.20 percent a month over 1990 to 2008 and plus 0.05 percent since 2009, neither
+      distinguishable from zero.
+    evidence: stat_tiles, horizon prior_1_0
+  - claim: The tilt toward past winners is positive in all five size quintiles over the full
+      sample, from 0.59 percent a month for the largest to 0.95 for the second smallest, and it
+      is not monotone in size. The largest quintile is the weakest.
     evidence: figure_size_prior_surface
-  - claim: The momentum factor lost 34.4 percent in April 2009 alone, its third worst month
-      on record after July and August 1932.
+  - claim: The momentum factor lost 34.4 percent in April 2009, its worst month since 1932 and
+      third worst on record. Its deepest drawdown is not 2009 but September 1939, at 78.5
+      percent. It last made a new high in November 2008 and remains 25.8 percent below it.
     evidence: figure_momentum_crash
-  - claim: Since 2009 the decile spread averages 0.16 percent a month with a Sharpe ratio of
-      0.06, against 1.56 percent and 0.71 over 1990 to 2008.
-    evidence: stat_tiles
+  - claim: Since 2009 the value weighted decile spread averages 0.16 percent a month, but the
+      95 percent interval runs from minus 1.07 to plus 1.39, and the difference from the 1990
+      to 2008 era is not significant (t 1.74, p 0.08). Excluding March and April 2009 alone
+      lifts the average to 0.57 percent. Compounded rather than averaged, the spread has lost
+      47 percent of its capital since 2009.
+    evidence: stat_tiles and the method notes
 
 method_notes: >-
-  The reproduction uses the value weighted decile portfolios published by Ken French, sorted
-  on prior returns and rebalanced monthly. That is close to but not identical with the
-  original construction, which formed overlapping portfolios held for 3 to 12 months and
-  skipped a week between formation and holding. Magnitudes are therefore in the same
-  neighbourhood as the published table rather than equal to it. Returns are gross, with no
-  transaction costs, no shorting costs and no capacity limit, which matters most for the
-  bottom decile.
+  **Construction.** The reproduction uses the decile portfolios published by Ken French,
+  sorted on prior returns and rebalanced monthly. The paper formed overlapping portfolios held
+  for 3 to 12 months and skipped a week between formation and holding, so the constructions
+  are close but not identical.
+
+
+  **Weighting is the whole difference in magnitude.** Jegadeesh and Titman used equal weighted
+  portfolios. On equal weighted deciles this reproduction gives 1.33 percent a month over 1965
+  to 1989, within 0.03 points of their published 1.31 percent. Value weighted gives 1.63
+  percent. The gap between the two is a weighting effect, not an effect of the holding period.
+  Their universe was NYSE and AMEX, while French includes NASDAQ, which also moves the number.
+
+
+  **Costs are absent, and they matter more than the alpha.** A decile sorted on past returns
+  and rebalanced every month turns over heavily on both legs. Charging a flat round trip cost
+  against the 1965 to 1989 spread: 0.5 percent a month leaves 1.13 percent and a Sharpe of
+  0.71, 1.0 percent leaves 0.63 percent and 0.40, and the strategy breaks even at roughly 1.6
+  percent. Borrowing cost on the short leg is not modelled at all.
+
+
+  **Sharpe ratios here are mean over standard deviation times the square root of 12, with no
+  risk free rate, which is defensible for a zero cost spread.** The series is strongly left
+  skewed (skew -2.1 on the full sample, excess kurtosis 15.6), so annualising by the square
+  root of 12 is optimistic. Read the n and the t alongside every ratio.
+
+
+  **The compounded figures are gross and long only.** One dollar in the top decile becomes
+  16,908 dollars from 1965 to 2026, against 535 dollars for the market over the same window.
+  The excess is about 6.4 points a year before any cost, not the whole 17.2 percent.
