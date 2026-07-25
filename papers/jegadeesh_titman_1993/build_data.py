@@ -37,8 +37,18 @@ SIZE_PRIOR = "25_Portfolios_ME_Prior_12_2_CSV.zip"
 FACTORS = "F-F_Research_Data_Factors_CSV.zip"
 MOMENTUM = "F-F_Momentum_Factor_CSV.zip"
 
-MISSING = (-99.99, -999.0, -99.0)
+MISSING = (-99.99, -999.0)
 _MONTH_ROW = re.compile(r"^\s*(\d{6})\s*,")
+
+# Ken French's own table titles are not uniform and contain at least one typo
+# ("Aerage Value Weighted Returns"), so the label match has to be loose. It still has to
+# happen: the same files also carry "Number of Firms in Portfolios" and "Average Firm Size"
+# tables with the same monthly shape, and picking one of those by position would produce
+# silently wrong data.
+_WEIGHTING = {
+    "vw": re.compile(r"value\s*weight.*monthly", re.I),
+    "ew": re.compile(r"equal\s*weight.*monthly", re.I),
+}
 
 
 def fetch(name: str) -> str:
@@ -55,12 +65,11 @@ def fetch(name: str) -> str:
         return zf.read(inner).decode("latin-1")
 
 
-def first_monthly_table(text: str) -> pd.DataFrame:
-    """Extract the first monthly table from a Ken French CSV.
+def monthly_blocks(text: str):
+    """Yield (title, frame) for every monthly table in a Ken French CSV.
 
-    These files stack several tables separated by blank lines: value weighted monthly
-    first, then equal weighted, then annual, then firm counts. The first one is the one we
-    want. A table is a header line starting with a comma, followed by rows keyed YYYYMM.
+    These files stack several tables separated by blank lines. A table is a title line, a
+    header line starting with a comma, then rows keyed YYYYMM.
     """
     lines = text.splitlines()
     for i, line in enumerate(lines):
@@ -73,28 +82,66 @@ def first_monthly_table(text: str) -> pd.DataFrame:
             rows.append(row)
         if len(rows) < 120:  # a real monthly table spans decades, not a stray match
             continue
+
+        title = next((lines[j] for j in range(i - 1, max(i - 4, -1), -1) if lines[j].strip()), "")
         header = [c.strip() for c in line.split(",")][1:]
         frame = pd.read_csv(io.StringIO("\n".join(rows)), header=None, index_col=0)
         frame.columns = header[: frame.shape[1]]
         frame.index = pd.to_datetime(frame.index.astype(str), format="%Y%m") + pd.offsets.MonthEnd(0)
         frame.index.name = "date"
-        return frame.astype("float64").replace(list(MISSING), float("nan")) / 100.0
-    raise ValueError("no monthly table found, the source layout probably changed")
+        yield title, frame.astype("float64").replace(list(MISSING), float("nan")) / 100.0
+
+
+def monthly_tables(text: str) -> dict[str, pd.DataFrame]:
+    """The return tables of a portfolio file, keyed by weighting.
+
+    Portfolio files carry value weighted returns, equal weighted returns, firm counts and
+    average firm size, several of them with the same monthly shape. Selecting by position
+    works until the source reorders and then fails silently, so each table is matched on its
+    own title instead.
+    """
+    found: dict[str, pd.DataFrame] = {}
+    for title, frame in monthly_blocks(text):
+        weighting = next((key for key, pattern in _WEIGHTING.items() if pattern.search(title)), None)
+        if weighting is not None and weighting not in found:
+            found[weighting] = frame
+    if "vw" not in found:
+        raise ValueError(f"no value weighted monthly table found, layout changed: {sorted(found)}")
+    return found
+
+
+def first_monthly_table(text: str) -> pd.DataFrame:
+    """The single monthly table of a factor file, which carries no weighting title."""
+    return next(frame for _title, frame in monthly_blocks(text))
 
 
 def build_deciles() -> pd.DataFrame:
-    """Tidy frame of decile returns: date, horizon, decile (1 to 10), ret."""
+    """Tidy decile returns: date, horizon, weighting, decile (1 to 10), ret.
+
+    Both weightings are kept. Jegadeesh and Titman formed equal weighted portfolios, so the
+    equal weighted series is the one that compares with their published table, while value
+    weighted is the modern convention and less driven by microcaps. Publishing only one of
+    them would misattribute the difference between the two.
+    """
     parts = []
     for key, (zip_name, _label) in HORIZONS.items():
-        wide = first_monthly_table(fetch(zip_name))
-        if wide.shape[1] != 10:
-            raise ValueError(f"{key}: expected 10 deciles, got {wide.shape[1]}: {list(wide.columns)}")
-        print(f"  {key}: {wide.shape[0]} months, {wide.index[0]:%Y-%m} to {wide.index[-1]:%Y-%m}")
-        tidy = wide.set_axis(range(1, 11), axis=1).stack().rename("ret").reset_index()
-        tidy.columns = ["date", "decile", "ret"]
-        tidy["horizon"] = key
-        parts.append(tidy)
-    return pd.concat(parts, ignore_index=True)[["date", "horizon", "decile", "ret"]]
+        tables = monthly_tables(fetch(zip_name))
+        for weighting, wide in tables.items():
+            if wide.shape[1] != 10:
+                raise ValueError(
+                    f"{key}/{weighting}: expected 10 deciles, got {wide.shape[1]}: {list(wide.columns)}"
+                )
+            tidy = wide.set_axis(range(1, 11), axis=1).stack().rename("ret").reset_index()
+            tidy.columns = ["date", "decile", "ret"]
+            tidy["horizon"] = key
+            tidy["weighting"] = weighting
+            parts.append(tidy)
+        span = tables["vw"]
+        print(
+            f"  {key}: {span.shape[0]} months, {span.index[0]:%Y-%m} to {span.index[-1]:%Y-%m}, "
+            f"weightings {sorted(tables)}"
+        )
+    return pd.concat(parts, ignore_index=True)[["date", "horizon", "weighting", "decile", "ret"]]
 
 
 def build_size_prior() -> pd.DataFrame:
@@ -104,7 +151,7 @@ def build_size_prior() -> pd.DataFrame:
     quintile across prior-return quintiles, and so on. We map by position rather than by
     the inconsistent column labels, and assert the count so a layout change fails loudly.
     """
-    wide = first_monthly_table(fetch(SIZE_PRIOR))
+    wide = monthly_tables(fetch(SIZE_PRIOR))["vw"]
     if wide.shape[1] != 25:
         raise ValueError(f"expected 25 portfolios, got {wide.shape[1]}")
     print(f"  size x prior: {wide.shape[0]} months, columns {list(wide.columns[:3])} ...")
@@ -120,7 +167,25 @@ def build_size_prior() -> pd.DataFrame:
                 }
             )
         )
-    return pd.concat(parts, ignore_index=True)
+    tidy = pd.concat(parts, ignore_index=True)
+    _assert_size_major(tidy)
+    return tidy
+
+
+def _assert_size_major(tidy: pd.DataFrame) -> None:
+    """Catch a silent size and prior transposition.
+
+    The positional mapping is the heaviest assumption in this file and the column labels are
+    too irregular to key on. Volatility falls monotonically with market capitalisation and is
+    U shaped across prior return, so a transposition breaks the monotonicity. Cheap check,
+    and it fires on exactly the mistake that would otherwise pass every test.
+    """
+    by_size = tidy.groupby("size_q").ret.std()
+    if not by_size.is_monotonic_decreasing:
+        raise ValueError(
+            "volatility is not decreasing in size_q, the 25 portfolios are probably "
+            f"transposed or reordered upstream: {by_size.round(4).to_dict()}"
+        )
 
 
 def build_factors() -> pd.DataFrame:
