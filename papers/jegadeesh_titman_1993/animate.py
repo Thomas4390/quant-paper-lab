@@ -8,8 +8,8 @@ where it can be rotated. The feed gets the hook, the app gets the toy.
 The axes are fixed from the first frame and the compounding runs once over the full history,
 so the curves grow into a stationary frame rather than the frame rescaling around them.
 
-    uv run --group render python papers/jegadeesh_titman_1993/animate.py
-    uv run --group render python papers/jegadeesh_titman_1993/animate.py --preview 1975
+    uv run --group render python -m papers.jegadeesh_titman_1993.animate
+    uv run --group render python -m papers.jegadeesh_titman_1993.animate --preview 1975
 
 Writes out/momentum-1993.mp4, the asset to upload, which git ignores because it is rebuilt
 per post. The derived GIF lands in assets/previews/ and is committed, because the README and
@@ -32,6 +32,9 @@ OUT = ROOT / "out"
 SLUG = "momentum-1993"
 
 HORIZON = "prior_12_2"
+# The clip shows value weighted deciles, the modern convention, which is also where the
+# compounded figure quoted in the post comes from. The footer says so.
+WEIGHTING = "vw"
 # The clock starts where the paper's own sample starts. Running from 1927 instead adds three
 # more decades of log axis and turns the headline into one dollar becoming 5.8 million, which
 # is true, gross of everything, and reads as a sales pitch. 1965 keeps the same 17 percent a
@@ -40,16 +43,13 @@ FIRST_YEAR = 1965
 FIRST_FRAME_YEAR = 1967  # a couple of years of curve, so frame one is not a single dot
 PUBLISHED_YEAR = 1993
 TITLE = "One dollar, sorted on last year's return"
-FOOTER = "Ken French decile portfolios, gross of costs · Jegadeesh and Titman (1993) · synerqo.com"
+FOOTER = "Ken French value weighted deciles, gross of costs · Jegadeesh and Titman (1993) · synerqo.com"
 
 
 def load() -> pd.DataFrame:
     tidy = pd.read_parquet(ROOT / "data" / "deciles.parquet")
-    wide = (
-        tidy[tidy.horizon == HORIZON]
-        .pivot(index="date", columns="decile", values="ret")
-        .sort_index()
-    )
+    picked = tidy[(tidy.horizon == HORIZON) & (tidy.weighting == WEIGHTING)]
+    wide = picked.pivot(index="date", columns="decile", values="ret").sort_index()
     return wide.loc[f"{FIRST_YEAR}":]
 
 
