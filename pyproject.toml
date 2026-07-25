@@ -1,0 +1,31 @@
+[project]
+name = "quant-paper-lab"
+version = "0.1.0"
+description = "Interactive reproductions of landmark financial engineering papers, on public data"
+requires-python = ">=3.13,<3.14"
+
+# Runtime dependencies only. Anything needed to *build* data or *render* video lives in
+# the dependency groups below, so the deployed app stays inside its 1 GB memory budget.
+# Mirror of requirements.txt (which is what Streamlit Community Cloud reads).
+dependencies = [
+    "streamlit>=1.40",
+    "plotly>=5.24",
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "pyarrow>=17",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "requests>=2.32",
+]
+# Static image export for the video pipeline. Never imported by the app.
+render = [
+    "kaleido>=0.2.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,0 +1,12 @@
+# Synerqo surface. Dark ships by default, emerald is the single accent.
+# Hex values mirror lab/theme.py, which is the source of truth for anything that draws.
+[theme]
+base = "dark"
+backgroundColor = "#0D0F12"
+secondaryBackgroundColor = "#15171A"
+textColor = "#EFF3F8"
+primaryColor = "#00C896"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false

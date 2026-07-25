@@ -1,0 +1,8 @@
+# Runtime only, read by Streamlit Community Cloud.
+# Mirror of [project].dependencies in pyproject.toml. Keep both in sync.
+streamlit>=1.40
+plotly>=5.24
+pandas>=2.2
+numpy>=2.0
+pyarrow>=17
+pyyaml>=6.0
