@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "app_base": "https://quant-paper-lab.streamlit.app",
+  "count": 1,
+  "items": [
+    {
+      "slug": "jegadeesh-titman-1993",
+      "published": "2026-07-25",
+      "title": "Returns to Buying Winners and Selling Losers",
+      "authors": "Narasimhan Jegadeesh, Sheridan Titman",
+      "year": 1993,
+      "paper_url": "https://doi.org/10.1111/j.1540-6261.1993.tb04702.x",
+      "app_url": "https://quant-paper-lab.streamlit.app/momentum-1993",
+      "one_liner": "Stocks that beat the market over the past year kept beating it over the following months. The result held for decades, then stopped paying the way it used to.",
+      "quotable": "Sorting stocks on their prior year of returns earned 1.63 percent a month over the sample in the original paper, and 0.16 percent a month since 2009."
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+slug: jegadeesh-titman-1993
+nav_title: Momentum
+url_path: momentum-1993
+title: Returns to Buying Winners and Selling Losers
+authors: Narasimhan Jegadeesh, Sheridan Titman
+year: 1993
+journal: The Journal of Finance, 48(1), 65 to 91
+doi: 10.1111/j.1540-6261.1993.tb04702.x
+url: https://doi.org/10.1111/j.1540-6261.1993.tb04702.x
+
+# Date the LinkedIn post goes out. Set it when the post is scheduled, because the manifest
+# read by linkedin-connector only exports papers that have one.
+published: 2026-07-25
+one_liner: >-
+  Stocks that beat the market over the past year kept beating it over the following months.
+  The result held for decades, then stopped paying the way it used to.
+
+# One sentence linkedin-connector can drop into a message. Written to stand alone.
+quotable: >-
+  Sorting stocks on their prior year of returns earned 1.63 percent a month over the sample
+  in the original paper, and 0.16 percent a month since 2009.
+
+data_sources:
+  - name: Kenneth R. French Data Library
+    url: https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+    licence: public, free
+
+# Every claim the post makes has to be checkable here, against a figure in the app or a
+# page of the paper. Numbers come from the reproduction, not from memory.
+claims:
+  - claim: Sorting on the prior 2 to 12 month return earned 1.63 percent a month over the
+      paper's own 1965 to 1989 window, top decile minus bottom decile.
+    evidence: figure_decile_fan
+  - claim: The sign of the effect depends entirely on the formation horizon. Prior 1 month
+      reverses at minus 0.78 percent a month, prior 13 to 60 months reverses at minus 0.42
+      percent, prior 2 to 12 months continues at plus 1.15 percent, all full sample.
+    evidence: figure_decile_fan
+  - claim: The tilt toward past winners is present in every size quintile and is weakest
+      among the largest stocks, 0.59 percent a month versus 0.88 for the smallest.
+    evidence: figure_size_prior_surface
+  - claim: The momentum factor lost 34.4 percent in April 2009 alone, its third worst month
+      on record after July and August 1932.
+    evidence: figure_momentum_crash
+  - claim: Since 2009 the decile spread averages 0.16 percent a month with a Sharpe ratio of
+      0.06, against 1.56 percent and 0.71 over 1990 to 2008.
+    evidence: stat_tiles
+
+method_notes: >-
+  The reproduction uses the value weighted decile portfolios published by Ken French, sorted
+  on prior returns and rebalanced monthly. That is close to but not identical with the
+  original construction, which formed overlapping portfolios held for 3 to 12 months and
+  skipped a week between formation and holding. Magnitudes are therefore in the same
+  neighbourhood as the published table rather than equal to it. Returns are gross, with no
+  transaction costs, no shorting costs and no capacity limit, which matters most for the
+  bottom decile.
