@@ -218,6 +218,118 @@ CSS = f"""
   line-height: 1.7;
 }}
 
+/* ---------------------------------------------------------------- the brand lockup */
+
+/* The Apex sits above the masthead rule, at the size the charter calls the minimum for the
+   primary logo. Clear space is half the symbol height, which is the margin below. */
+.brand-lockup svg {{ display: block; height: 52px; width: auto; }}
+.brand-lockup {{ margin-bottom: 30px; }}
+
+.masthead {{
+  border-top: 1px solid {LINE};
+  padding-top: 26px;
+}}
+
+/* A quiet strip of what the reader is getting, in the monospace reserved for figures, so it
+   reads as metadata rather than as marketing. */
+.ledger {{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 28px;
+  font-family: {FONT_MONO};
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: {FG_SUBTLE};
+  border-top: 1px solid {LINE};
+  padding: 12px 0 0;
+  margin: 30px 0 0;
+}}
+.ledger b {{ color: {FG_MUTED}; font-weight: 400; }}
+
+/* ---------------------------------------------------------------- the paper entries */
+
+/* The ledger closes on this rule rather than carrying its own. Two hairlines seventy pixels
+   apart read as a rendering accident, not as structure. */
+.entry-rule {{ border-top: 1px solid {LINE}; margin: 34px 0 22px; }}
+
+.entry-title {{
+  font-family: {FONT_DISPLAY};
+  font-size: 27px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: {FG};
+  margin: 8px 0 10px;
+}}
+
+.entry-meta {{
+  font-family: {FONT_MONO};
+  font-size: 11.5px;
+  color: {FG_SUBTLE};
+  margin: 12px 0 18px;
+}}
+.entry-meta span {{ color: {FG_MUTED}; }}
+
+/* The still is data, not decoration, so it gets a hairline and no rounding, like a plate in
+   a paper rather than a card in a feed. */
+.stImage img {{ border: 1px solid {LINE}; width: 100%; }}
+
+.plate-note {{
+  color: {FG_SUBTLE};
+  font-size: 12.5px;
+  line-height: 1.6;
+  max-width: var(--measure);
+  margin: 10px 0 22px;
+}}
+
+/* Contact before the legal notice, quiet, in the monospace the figures use. */
+.colophon {{
+  display: flex;
+  gap: 24px;
+  font-family: {FONT_MONO};
+  font-size: 12px;
+  margin-top: 54px;
+}}
+.colophon a {{ color: {FG_MUTED}; text-decoration: none; }}
+.colophon a:hover {{ color: {ACCENT}; }}
+.colophon + .disclaimer {{ margin-top: 18px; }}
+
+/* ---------------------------------------------------------------- the call to action */
+
+/* st.page_link ships as an underlined blue-ish link, which reads as boilerplate next to a
+   Playfair title. Outlined rather than filled: emerald stays under a tenth of the chrome and
+   is spent on the arrow and the hover, where it means "go". */
+[data-testid="stPageLink"] a[data-testid="stPageLink-NavLink"] {{
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 20px;
+  border: 1px solid {LINE_STRONG};
+  border-radius: 2px;
+  background: {BG_ELEVATED};
+  text-decoration: none;
+  transition: border-color 220ms cubic-bezier(0.25, 1, 0.5, 1),
+              background-color 220ms cubic-bezier(0.25, 1, 0.5, 1);
+}}
+[data-testid="stPageLink"] a[data-testid="stPageLink-NavLink"] p {{
+  font-family: {FONT_BODY};
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: {FG};
+  margin: 0;
+}}
+[data-testid="stPageLink"] a[data-testid="stPageLink-NavLink"] p::after {{
+  content: " \\2192";
+  color: {ACCENT};
+  letter-spacing: 0;
+  padding-left: 10px;
+}}
+[data-testid="stPageLink"] a[data-testid="stPageLink-NavLink"]:hover {{
+  border-color: {ACCENT};
+  background: {BG};
+}}
+[data-testid="stPageLink"] a[data-testid="stPageLink-NavLink"]:hover p {{ color: {ACCENT}; }}
+
 /* The slider rail was the most saturated block on the page, in the same emerald that means
    "top decile" two hundred pixels above. Rail neutral, handle emerald. */
 [data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {{ background: {ACCENT}; }}

@@ -15,9 +15,21 @@ from lab import registry
 
 
 def test_the_library_page_renders() -> None:
+    """The index carries the brand, a heading, and a way into every paper it lists.
+
+    Asserted on the rendered markup rather than on st.title, because the masthead is laid out
+    by hand: what matters is that a reader gets a lockup and an h1, not which Streamlit
+    primitive drew them.
+    """
     app = AppTest.from_file("streamlit_app.py", default_timeout=180).run()
     assert not app.exception, [e.value for e in app.exception]
-    assert app.title[0].value
+
+    page = " ".join(str(block.value) for block in app.markdown)
+    assert "<h1" in page, "the library page has no heading"
+    assert "Landmark papers" in page
+    assert 'aria-label="Synerqo"' in page, "the brand lockup is missing from the masthead"
+    assert "not investment advice" in page, "the standing notice has to survive every change"
+    assert len(app.get("page_link")) == len(registry.papers()), "every paper needs a way in"
 
 
 @pytest.mark.parametrize("paper", registry.papers(), ids=lambda p: p["slug"])
