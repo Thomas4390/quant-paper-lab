@@ -8,7 +8,12 @@ from __future__ import annotations
 
 import streamlit as st
 
-from lab import registry, theme
+from lab import arrow, registry, theme
+
+# Before anything imports pyarrow, which is why it sits above every other statement that runs.
+# Streamlit reaches for Arrow the first time a dataframe is rendered, and on pyarrow's own
+# default pool that call segfaults the whole server. See lab/arrow.py.
+arrow.use_stable_memory_pool()
 
 st.set_page_config(
     page_title="Quant Paper Lab · Synerqo",
