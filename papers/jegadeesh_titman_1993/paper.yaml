@@ -12,6 +12,12 @@ url: https://doi.org/10.1111/j.1540-6261.1993.tb04702.x
 # read by linkedin-connector only exports papers that have one.
 published: 2026-07-25
 
+# Legend for the still the library index shows, written like a figure caption. Rebuild the
+# still with `python -m papers.jegadeesh_titman_1993.animate --card`.
+card_note: >-
+  One dollar in each formation decile, value weighted, 1965 to today, log scale. The dotted
+  line is publication.
+
 one_liner: >-
   Stocks that beat the market over the past year kept beating it over the following months.
   Reproduced on the paper's own weighting, the result comes back within 0.03 points of the

@@ -101,6 +101,104 @@ def test_fan_labels_do_not_round_a_multiple_into_a_lie() -> None:
         assert f"{exact[decile]:,.2f}" in labels, f"decile {decile} label lost precision: {labels}"
 
 
+# --------------------------------------------------------------- the fan, playing
+
+
+def animated(window: str, stop: str | None = None):
+    wide = data.deciles("prior_12_2").loc[window:stop]
+    return wide, figures.fig_decile_fan_animation(
+        wide,
+        horizon_label="test",
+        y_log_range=figures.shared_log_range([wide]),
+        x_range=[wide.index[0], wide.index[-1]] if not wide.empty else None,
+        published_year=1993,
+    )
+
+
+def test_an_empty_window_animates_into_a_figure_that_says_so() -> None:
+    empty = data.deciles("prior_60_13").loc["1927":"1930"]
+    fig = figures.fig_decile_fan_animation(empty, horizon_label="test")
+    assert not fig.frames, "there is nothing to reveal"
+    assert fig.layout.annotations, "an empty window has to say so on the figure"
+
+
+def test_a_window_too_short_to_reveal_is_just_the_figure() -> None:
+    _, fig = animated("1965", "1965")
+    assert len(fig.frames) <= 1
+    assert len(fig.data) == 10, "the curves are still drawn"
+
+
+def test_the_figure_opens_complete_so_not_pressing_play_costs_nothing() -> None:
+    """The whole justification for animating a curve the reader can already see whole."""
+    wide, fig = animated("1965", "1989")
+    static = figures.fig_decile_fan(wide, horizon_label="test", show_title=False)
+    assert len(fig.data[0].y) == len(wide), "the base figure is the full curve, not the first frame"
+    assert [a.text for a in fig.layout.annotations] == [a.text for a in static.layout.annotations]
+    assert fig.layout.sliders[0].active == len(fig.frames) - 1, "the handle matches what is drawn"
+
+
+def test_the_last_frame_lands_on_the_static_figure() -> None:
+    wide, fig = animated("1965", "1989")
+    assert len(fig.frames[-1].data[0].y) == len(wide)
+    assert [a["text"] for a in fig.frames[-1].layout.annotations] == [
+        a.text for a in fig.layout.annotations
+    ]
+
+
+def test_no_frame_rescales_the_axis_under_the_reader() -> None:
+    """A frame may move the marks and nothing else. An axis in there would rescale mid flight."""
+    for frame in animated("1965", "1989")[1].frames:
+        carried = set(frame.layout.to_plotly_json())
+        assert carried <= {"annotations", "shapes"}, f"a frame also carries {carried}"
+
+
+@pytest.mark.parametrize("window,stop", [("1927", "2026"), ("1965", "2026"), ("1965", "1989")])
+def test_frames_stay_inside_the_payload_budget(window: str, stop: str) -> None:
+    """The reader picks the window, so the frame count has to answer to it."""
+    _, fig = animated(window, stop)
+    shipped = sum(len(frame.data[0].y) * 10 for frame in fig.frames)
+    assert shipped <= figures.FRAME_BUDGET_VALUES * 1.2, (
+        f"{window} to {stop} ships {shipped:,} values against a budget of "
+        f"{figures.FRAME_BUDGET_VALUES:,}"
+    )
+
+
+# --------------------------------------------------------------- the publication mark
+
+
+def test_the_figure_the_page_builds_can_still_be_exported() -> None:
+    """A Timestamp in the axis range survives Plotly and dies in the static export.
+
+    The page passes index entries straight through, so the figure it draws could not be
+    written to a PNG, which is the one way a chart is supposed to be judged.
+    """
+    _, fig = animated("1965", "1989")
+    assert all(isinstance(bound, str) for bound in fig.layout.xaxis.range)
+
+
+def test_the_mark_is_absent_when_the_window_does_not_reach_publication() -> None:
+    """The default window stops in 1989. A mark outside the drawn range would be a lie."""
+    _, before = animated("1965", "1989")
+    _, after = animated("1994", "2026")
+    assert not before.layout.shapes
+    assert not after.layout.shapes
+
+
+def test_the_mark_appears_once_the_window_contains_publication() -> None:
+    _, fig = animated("1965", "2000")
+    assert len(fig.layout.shapes) == 1
+    assert any("published" in a.text for a in fig.layout.annotations)
+
+
+def test_the_mark_waits_for_the_reveal_to_reach_it() -> None:
+    """The beat the video was built around: it lands as the curve passes 1993, not before."""
+    _, fig = animated("1965", "2000")
+    marked = [bool(frame.layout.shapes) for frame in fig.frames]
+    assert not marked[0], "the first stop is decades short of publication"
+    assert marked[-1], "the last stop is past it"
+    assert marked == sorted(marked), "the mark can only ever arrive, never leave"
+
+
 def test_log_range_stays_finite_on_degenerate_input() -> None:
     flat = pd.DataFrame(
         [[-1.0] * 10, [0.05] * 10],

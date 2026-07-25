@@ -46,17 +46,23 @@ with window_column:
     first, last = data.coverage(horizon)
     # The key stays stable so the reader keeps their window when switching horizon, and the
     # stored value is pulled back inside the new coverage rather than left out of range.
-    if isinstance(st.session_state.get("fan_years"), tuple):
-        low, high = st.session_state["fan_years"]
-        st.session_state["fan_years"] = (
-            min(max(low, first.year), last.year),
-            min(max(high, first.year), last.year),
-        )
+    #
+    # The opening window is seeded into session state rather than passed as `value`. Streamlit
+    # warns when a keyed widget is given both, and rightly: the two are different sources of
+    # truth for the same control, and the stored one silently wins.
+    stored = st.session_state.get("fan_years")
+    if isinstance(stored, (tuple, list)) and len(stored) == 2:
+        low, high = stored
+    else:
+        low, high = 1965, 1989
+    st.session_state["fan_years"] = (
+        min(max(low, first.year), last.year),
+        min(max(high, first.year), last.year),
+    )
     years = st.slider(
         "Window",
         min_value=first.year,
         max_value=last.year,
-        value=(max(1965, first.year), min(1989, last.year)),
         key="fan_years",
     )
 
@@ -87,17 +93,18 @@ layout.section(
     "reverses again.",
 )
 layout.figure(
-    figures.fig_decile_fan(
+    figures.fig_decile_fan_animation(
         wide,
         horizon_label=data.HORIZON_LABELS[horizon],
-        show_title=False,
         y_log_range=shared_y,
         x_range=[wide.index[0], wide.index[-1]] if not wide.empty else None,
+        published_year=int(paper["year"]),
     ),
     note=(
         f"{data.WEIGHTINGS[weighting]} deciles, {years[0]} to {years[1]}. Compounding restarts "
         "at the left edge of the window, so the multiples are for that window only. The "
-        "paper's own sample is 1965 to 1989."
+        "paper's own sample is 1965 to 1989. Press play to watch it build; the mark appears "
+        "when the window reaches publication."
     ),
     key="fan",
 )
@@ -148,6 +155,9 @@ with st.expander("How this reproduction differs from the paper, and what the num
         figures.decile_table(wide),
         width="stretch",
         hide_index=True,
+        column_config={
+            "Mean %/month": st.column_config.NumberColumn(format="%.2f"),
+        },
     )
     st.markdown("**Claims on this page, and where to check them**")
     st.markdown("\n".join(f"- {claim['claim']} `{claim['evidence']}`" for claim in paper["claims"]))

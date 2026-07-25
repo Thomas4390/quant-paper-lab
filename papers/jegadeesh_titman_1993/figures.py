@@ -2,7 +2,9 @@
 
 This module is the single source of visual truth. The Streamlit page imports it, and so does
 animate.py when it renders the video. Nothing here knows about either one, and nothing here
-reads a file: callers pass data in.
+reads a file: callers pass data in. That includes the narrative marks: the line at
+publication used to be drawn by animate.py, which is how the video carried it for a year while
+the app never did. Numbers are formatted through lab/format.py, for the same reason.
 
 Encoding choices, so they are not re-litigated per figure:
   Decile rank is ordered, not signed, so the ten lines take a single hue ramp with the bottom
@@ -20,6 +22,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from lab import format as fmt
 from lab import theme
 
 WINDOW_YEARS = 10
@@ -37,21 +40,6 @@ def _rank_colors() -> list[str]:
     the extremes stays obvious.
     """
     return [theme.NEGATIVE, *theme.RANK_RAMP]
-
-
-def _multiple(value: float) -> str:
-    """Format a growth multiple at the precision a reader would check.
-
-    Rounding to the nearest integer printed 1.5152 as 2x, a 32 percent overstatement on any
-    short window.
-    """
-    if not np.isfinite(value):
-        return "n/a"
-    if value >= 100:
-        return f"{value:,.0f}x"
-    if value >= 10:
-        return f"{value:,.1f}x"
-    return f"{value:,.2f}x"
 
 
 def _empty(message: str, height: int) -> go.Figure:
@@ -119,6 +107,84 @@ def shared_log_range(windows) -> list[float]:
     return [min(r[0] for r in ranges), max(r[1] for r in ranges)]
 
 
+def _as_dates(bounds: list | None) -> list | None:
+    """An axis range as strings, so the figure survives a static export."""
+    if bounds is None:
+        return None
+    return [b.isoformat() if hasattr(b, "isoformat") else b for b in bounds]
+
+
+def _end_labels(shown: pd.DataFrame, colors: list[str], size: int) -> list[dict]:
+    """The two labels that ride the end of the drawn lines.
+
+    Returned as plain dicts instead of being added to a figure, because an animated reveal has
+    to rebuild them per frame: they are layout, and they travel with the last drawn point.
+    """
+    last = shown.index[-1]
+    labels = []
+    for decile, text in ((10, "Top decile"), (1, "Bottom decile")):
+        value = float(shown[decile].iloc[-1])
+        labels.append(
+            {
+                "x": last.isoformat(),
+                "y": float(np.log10(max(value, 1e-6))),
+                "text": f"  {text} · {fmt.multiple(value)}",
+                "showarrow": False,
+                "xanchor": "left",
+                "font": {"family": theme.FONT_BODY, "size": size, "color": colors[decile - 1]},
+            }
+        )
+    return labels
+
+
+def publication_mark(year: int, size: int) -> tuple[dict, dict]:
+    """The dotted line where the paper lands, and the note that names it.
+
+    It lives here rather than in the caller that first wanted it. The video drew this mark for
+    a year while the app had never had it, which is exactly what a module calling itself the
+    single source of visual truth is supposed to prevent.
+
+    Milliseconds since the epoch, not a date string: that is the coordinate a shape takes on a
+    date axis, and it is what the rendered video has been using.
+    """
+    stamp = pd.Timestamp(f"{year}-01-01").timestamp() * 1000
+    line = {
+        "type": "line",
+        "x0": stamp,
+        "x1": stamp,
+        "y0": 0,
+        "y1": 1,
+        "yref": "y domain",
+        "line": {"color": theme.LINE_STRONG, "width": 1, "dash": "dot"},
+    }
+    note = {
+        "x": stamp,
+        "y": 1.0,
+        "yref": "y domain",
+        "text": "the paper is published",
+        "showarrow": False,
+        "xanchor": "left",
+        "yanchor": "bottom",
+        "font": {"family": theme.FONT_BODY, "size": size, "color": theme.FG_MUTED},
+    }
+    return line, note
+
+
+def _marks(shown: pd.DataFrame, published_year: int | None, size: int) -> tuple[list, list]:
+    """Shapes and annotations for one drawn state: the end labels, plus the mark if it is due.
+
+    The mark is withheld on two counts. Outside the drawn range it would be a lie about the
+    scale, and ahead of the reveal it would give away the beat the animation exists for.
+    """
+    shapes: list[dict] = []
+    annotations = _end_labels(shown, _rank_colors(), size)
+    if published_year is not None and shown.index[0].year <= published_year <= shown.index[-1].year:
+        line, note = publication_mark(published_year, max(11, size - 3))
+        shapes.append(line)
+        annotations.append(note)
+    return shapes, annotations
+
+
 def fig_decile_fan(
     wide: pd.DataFrame,
     *,
@@ -129,12 +195,14 @@ def fig_decile_fan(
     height: int = 460,
     label_size: int = 12,
     show_title: bool = True,
+    published_year: int | None = None,
 ) -> go.Figure:
     """Cumulative value of one dollar in each prior-return decile, log scale.
 
     wide: monthly returns, index month end, columns 1 to 10, already sliced to the window.
     reveal_until truncates the drawn portion without restarting the compounding, which is what
     makes the animated version grow into a fixed frame instead of rescaling.
+    published_year draws the mark where the paper lands, when the drawn range has reached it.
     """
     if wide.empty:
         return _empty(f"No data for this window on {horizon_label.lower()}.", height)
@@ -158,28 +226,20 @@ def fig_decile_fan(
                 line={"color": colors[decile - 1], "width": 2.2 if extreme else 1.1},
                 opacity=1.0 if extreme else 0.75,
                 showlegend=False,
-                hovertemplate="%{y:,.2f}x<extra>%{fullData.name}</extra>",
+                hovertemplate=f"%{{y:{fmt.NUMBER}}}x<extra>%{{fullData.name}}</extra>",
             )
         )
 
     # Labels ride the end of each line, so an animated reveal carries its own legend and the
     # static version needs no legend box competing with the title.
-    last = shown.index[-1]
-    for decile, text in ((10, "Top decile"), (1, "Bottom decile")):
-        value = float(shown[decile].iloc[-1])
-        fig.add_annotation(
-            x=last.isoformat(),
-            y=float(np.log10(max(value, 1e-6))),
-            text=f"  {text} · {_multiple(value)}",
-            showarrow=False,
-            xanchor="left",
-            font={"family": theme.FONT_BODY, "size": label_size, "color": colors[decile - 1]},
-        )
+    shapes, annotations = _marks(shown, published_year, label_size)
 
     axis_range = y_log_range if y_log_range is not None else log_range(shown)
     decades = axis_range[1] - axis_range[0]
     fig.update_layout(
         title=f"One dollar by formation decile · {horizon_label}" if show_title else None,
+        shapes=shapes,
+        annotations=annotations,
         yaxis={
             "type": "log",
             "title": "Value of one dollar, log scale",
@@ -187,13 +247,214 @@ def fig_decile_fan(
             # Decade ticks are right across a wide span and leave a single gridline across a
             # narrow one, so the choice follows the span.
             "dtick": 1 if decades >= 2.0 else None,
+            "tickformat": fmt.NUMBER,
         },
-        xaxis={"title": None, "range": x_range},
+        # Timestamps go in as strings. Plotly's own encoder takes them either way, but the
+        # static export path does not, so a figure built the way the page builds it could not
+        # be written to PNG and therefore could not be looked at.
+        xaxis={"title": None, "range": _as_dates(x_range)},
         hovermode="x unified",
         margin={"l": 64, "r": 165, "t": 56 if show_title else 24, "b": 40},
         height=height,
     )
     return fig
+
+
+# --------------------------------------------------------------------------- animation
+
+
+def _play_pause(duration: int, *, from_current: bool, y: float = -0.02) -> dict:
+    """Play and Pause, styled here because their defaults ignore the template.
+
+    Left alone they land as white browser chrome on a graphite page. `redraw` is on for both
+    figures that use this: the surface because a 3D trace never updates without it, the fan
+    because its frames move layout annotations, which a data-only redraw does not touch.
+
+    `y` is a fraction of the plotting area, measured down from its bottom edge. A 3D scene has
+    nothing under it, so the default sits close. A cartesian figure has its tick labels there,
+    and the readout lands on top of them unless the controls are pushed clear.
+    """
+    return {
+        "type": "buttons",
+        "direction": "right",
+        "showactive": False,
+        "x": 0,
+        "y": y,
+        "xanchor": "left",
+        "yanchor": "top",
+        "pad": {"r": 8},
+        "font": {"family": theme.FONT_BODY, "size": 12, "color": theme.FG},
+        "bgcolor": theme.BG_ELEVATED,
+        "bordercolor": theme.LINE_STRONG,
+        "borderwidth": 1,
+        "buttons": [
+            {
+                "label": "Play",
+                "method": "animate",
+                "args": [
+                    None,
+                    {
+                        "frame": {"duration": duration, "redraw": True},
+                        "fromcurrent": from_current,
+                        "transition": {"duration": 0},
+                    },
+                ],
+            },
+            {
+                "label": "Pause",
+                "method": "animate",
+                "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate"}],
+            },
+        ],
+    }
+
+
+def _slider(
+    names: list[str], labels: list[str], prefix: str, *, active: int, y: float = -0.02
+) -> dict:
+    """One step per frame. Scrubbing runs client side, with no rerun and no server work."""
+    return {
+        "active": active,
+        "x": 0.18,
+        "y": y,
+        "len": 0.78,
+        "yanchor": "top",
+        "pad": {"t": 6},
+        "bgcolor": theme.LINE,
+        "bordercolor": theme.LINE_STRONG,
+        "borderwidth": 0,
+        "tickcolor": theme.LINE_STRONG,
+        "font": {"family": theme.FONT_MONO, "size": 11, "color": theme.FG_SUBTLE},
+        "currentvalue": {
+            "prefix": prefix,
+            "font": {"family": theme.FONT_MONO, "size": 13, "color": theme.ACCENT},
+        },
+        "steps": [
+            {
+                # The step label is also the readout, so it stays short and the slider prefix
+                # carries the meaning. Plotly thins the ticks itself.
+                "label": label,
+                "method": "animate",
+                "args": [[name], {"frame": {"duration": 0, "redraw": True}, "mode": "immediate"}],
+            }
+            for name, label in zip(names, labels, strict=True)
+        ],
+    }
+
+
+#: Months that end a reveal stop. Twice a year is the video's own cadence (animate.py), and
+#: the app matches it so the two read as the same animation at the same rate.
+STOP_MONTHS = (6, 12)
+
+#: The video opens on two years of curve rather than a single dot, and so does the app.
+HEAD_START_YEARS = 2
+
+#: Float values a fan animation may ship. Sized by measurement rather than by taste: it leaves
+#: the default 1965 to 1989 window the video's full twice-a-year cadence, at about 870 KB of
+#: figure spec and 90 KB on the wire, and caps the whole century a reader can drag to at the
+#: same cost by thinning the stops instead of the curve. Ungoverned, that century would be two
+#: hundred frames and some 20 MB. Frames grow from nothing to the full window, so they average
+#: half its length, which is the 5 rather than the 10 deciles in the arithmetic below.
+FRAME_BUDGET_VALUES = 80_000
+
+
+def reveal_steps(index: pd.DatetimeIndex, budget: int = FRAME_BUDGET_VALUES) -> list[pd.Timestamp]:
+    """Where to stop the reveal: the video's cadence, thinned only when it will not fit.
+
+    Twenty five years get all fifty stops, so the app plays exactly what the clip plays. A
+    century keeps the same budget by taking every eighth stop. Fewer stops on the same data,
+    never a thinned curve: the animation has to end on exactly the figure drawn without it.
+    """
+    if len(index) == 0:
+        return []
+    head = index[0] + pd.DateOffset(years=HEAD_START_YEARS)
+    candidates = list(index[(index.month.isin(STOP_MONTHS)) & (index >= head)])
+    if not candidates:
+        return [index[-1]]
+
+    affordable = max(2, budget // (5 * len(index)))
+    stride = max(1, -(-len(candidates) // affordable))
+    stops = candidates[::stride]
+    if stops[-1] != index[-1]:
+        stops.append(index[-1])
+    return stops
+
+
+def fig_decile_fan_animation(
+    wide: pd.DataFrame,
+    *,
+    horizon_label: str,
+    x_range: list | None = None,
+    y_log_range: list[float] | None = None,
+    height: int = 540,
+    label_size: int = 12,
+    published_year: int | None = None,
+) -> go.Figure:
+    """The fan again, with the reveal the video does, playable in the browser.
+
+    A curve redrawing itself does not usually earn an animation, because the reader can
+    already see the whole curve. What earns it here is that the figure **opens complete**: a
+    reader who never presses play gets exactly the chart that was there before, and the motion
+    is theirs to ask for, which is also how prefers-reduced-motion is honoured. Play rewinds
+    and draws, so it always does something; the slider scrubs.
+
+    Frames carry only y, as float32, cut at the stop. x is never resent: it stays on the base
+    traces at full length, and Plotly draws whichever of the two runs out first, so a short y
+    is a reveal. That is half the payload of masking the tail with nulls, and a quarter of
+    resending the dates. The y range is fixed for all of them, so the curves grow into a
+    stationary frame rather than the frame rescaling around them.
+    """
+    base = fig_decile_fan(
+        wide,
+        horizon_label=horizon_label,
+        x_range=x_range,
+        y_log_range=y_log_range,
+        height=height,
+        label_size=label_size,
+        show_title=False,
+        published_year=published_year,
+    )
+    if wide.empty:
+        return base
+
+    wealth = wealth_curves(wide)
+    stops = reveal_steps(wealth.index)
+    if len(stops) < 2:  # a window too short to reveal is just the figure
+        return base
+
+    frames = []
+    for stop in stops:
+        drawn = wealth.loc[:stop]
+        shapes, annotations = _marks(drawn, published_year, label_size)
+        frames.append(
+            go.Frame(
+                name=stop.isoformat(),
+                data=[
+                    go.Scatter(y=drawn[decile].to_numpy(dtype="float32"))
+                    for decile in range(1, 11)
+                ],
+                layout={"shapes": shapes, "annotations": annotations},
+            )
+        )
+    base.frames = frames
+    # The controls clear the x axis rather than sitting on it, which is what the extra bottom
+    # margin buys: tick labels, then buttons and the handle, then the handle's own ticks.
+    below_the_axis = -0.09
+    base.update_layout(
+        margin={"l": 64, "r": 165, "t": 24, "b": 112},
+        # 83 ms is the video's 12 fps. Same cadence, same rate, same animation.
+        updatemenus=[_play_pause(83, from_current=False, y=below_the_axis)],
+        sliders=[
+            _slider(
+                [frame.name for frame in frames],
+                [str(stop.year) for stop in stops],
+                "drawn through ",
+                active=len(frames) - 1,
+                y=below_the_axis,
+            )
+        ],
+    )
+    return base
 
 
 # --------------------------------------------------------------------------- surface
@@ -260,7 +521,10 @@ def _surface(matrix: np.ndarray, bounds: tuple[float, float], show_colorbar: boo
         cmax=bounds[1],
         lighting={"ambient": 0.9, "diffuse": 0.3, "specular": 0.03, "roughness": 1.0},
         contours={"z": {"show": True, "color": theme.LINE, "width": 1, "usecolormap": False}},
-        hovertemplate="size Q%{y} · prior Q%{x}<br>%{z:+.2f} points vs window average<extra></extra>",
+        hovertemplate=(
+            f"size Q%{{y}} · prior Q%{{x}}<br>%{{z:{fmt.SIGNED}}} points vs window average"
+            "<extra></extra>"
+        ),
         showscale=show_colorbar,
         colorbar={
             "title": {
@@ -268,6 +532,7 @@ def _surface(matrix: np.ndarray, bounds: tuple[float, float], show_colorbar: boo
                 "font": {"family": theme.FONT_BODY, "size": 11, "color": theme.FG_MUTED},
             },
             "tickfont": {"family": theme.FONT_MONO, "size": 10, "color": theme.FG_SUBTLE},
+            "tickformat": fmt.NUMBER,
             "outlinewidth": 0,
             "thickness": 10,
             "len": 0.55,
@@ -281,7 +546,7 @@ def _scene(bounds: tuple[float, float]) -> dict:
     scene["domain"] = {"x": [0.02, 0.9], "y": [0.0, 1.0]}
     scene["xaxis"] |= {"tickmode": "array", "tickvals": list(range(1, 6)), "ticktext": PRIOR_TICKS}
     scene["yaxis"] |= {"tickmode": "array", "tickvals": list(range(1, 6)), "ticktext": SIZE_TICKS}
-    scene["zaxis"] |= {"range": list(bounds), "dtick": 0.5}
+    scene["zaxis"] |= {"range": list(bounds), "dtick": 0.5, "tickformat": fmt.NUMBER}
     # Taller relief and a closer eye than the default, because the whole point of the third
     # dimension here is a difference of about a point a month, and a 3D scene left to itself
     # sits small in the middle of a wide container.
@@ -345,83 +610,18 @@ def fig_size_prior_animation(
     fig = go.Figure(data=[_surface(tilt(window_mean(dates, cube, starts[0])), bounds, True)])
     fig.frames = frames
 
-    button = {
-        "font": {"family": theme.FONT_BODY, "size": 12, "color": theme.FG},
-        "bgcolor": theme.BG_ELEVATED,
-        "bordercolor": theme.LINE_STRONG,
-        "borderwidth": 1,
-    }
     fig.update_layout(
         scene=_scene(bounds),
         height=height,
         margin={"l": 60, "r": 20, "t": 10, "b": 80},
-        updatemenus=[
-            {
-                "type": "buttons",
-                "direction": "right",
-                "showactive": False,
-                "x": 0,
-                "y": -0.02,
-                "xanchor": "left",
-                "yanchor": "top",
-                "pad": {"r": 8},
-                **button,
-                "buttons": [
-                    {
-                        "label": "Play",
-                        "method": "animate",
-                        # 3D traces need redraw, otherwise the surface never updates.
-                        "args": [
-                            None,
-                            {
-                                "frame": {"duration": 240, "redraw": True},
-                                "fromcurrent": True,
-                                "transition": {"duration": 0},
-                            },
-                        ],
-                    },
-                    {
-                        "label": "Pause",
-                        "method": "animate",
-                        "args": [
-                            [None],
-                            {"frame": {"duration": 0, "redraw": False}, "mode": "immediate"},
-                        ],
-                    },
-                ],
-            }
-        ],
+        updatemenus=[_play_pause(240, from_current=True)],
         sliders=[
-            {
-                "active": 0,
-                "x": 0.18,
-                "y": -0.02,
-                "len": 0.78,
-                "yanchor": "top",
-                "pad": {"t": 6},
-                "bgcolor": theme.LINE,
-                "bordercolor": theme.LINE_STRONG,
-                "borderwidth": 0,
-                "tickcolor": theme.LINE_STRONG,
-                "font": {"family": theme.FONT_MONO, "size": 11, "color": theme.FG_SUBTLE},
-                "currentvalue": {
-                    "prefix": "ten years from ",
-                    "font": {"family": theme.FONT_MONO, "size": 13, "color": theme.ACCENT},
-                },
-                "steps": [
-                    {
-                        # The step label is also the readout, so it stays short and the
-                        # slider prefix carries the meaning. Plotly thins the ticks itself.
-                        "label": str(year),
-                        "method": "animate",
-                        "args": [
-                            [label(year)],
-                            {"frame": {"duration": 0, "redraw": True}, "mode": "immediate"},
-                        ],
-                    }
-                    for year in starts
-                ],
-            }
+            _slider(
+                [label(year) for year in starts],
+                [str(year) for year in starts],
+                "ten years from ",
+                active=0,
+            )
         ],
     )
     return fig
@@ -448,7 +648,7 @@ def fig_momentum_crash(mom: pd.Series, height: int = 400, *, show_title: bool = 
             fill="tozeroy",
             fillcolor="rgba(255,124,0,0.14)",
             showlegend=False,
-            hovertemplate="%{x|%b %Y}<br>%{y:.0%} below peak<extra></extra>",
+            hovertemplate=f"%{{x|%b %Y}}<br>%{{y:{fmt.PERCENT}}} below peak<extra></extra>",
         )
     )
 
@@ -458,9 +658,14 @@ def fig_momentum_crash(mom: pd.Series, height: int = 400, *, show_title: bool = 
     modern_trough = drawdown.loc["2009":"2012"].idxmin()
     today = drawdown.index[-1]
     marks = [
-        (deepest, f"{deepest:%B %Y}, {drawdown.loc[deepest]:.0%} below peak", 46, -46),
-        (modern_trough, f"{modern_trough:%B %Y}, {drawdown.loc[modern_trough]:.0%} below peak", 6, 62),
-        (today, f"still {drawdown.loc[today]:.0%} below its 2008 peak", -110, -46),
+        (deepest, f"{deepest:%B %Y}, {drawdown.loc[deepest]:{fmt.PERCENT}} below peak", 46, -46),
+        (
+            modern_trough,
+            f"{modern_trough:%B %Y}, {drawdown.loc[modern_trough]:{fmt.PERCENT}} below peak",
+            6,
+            62,
+        ),
+        (today, f"still {drawdown.loc[today]:{fmt.PERCENT}} below its 2008 peak", -110, -46),
     ]
     for stamp, note, ax, ay in marks:
         fig.add_annotation(
@@ -478,7 +683,7 @@ def fig_momentum_crash(mom: pd.Series, height: int = 400, *, show_title: bool = 
 
     fig.update_layout(
         title="Momentum factor drawdown, monthly" if show_title else None,
-        yaxis={"tickformat": ".0%", "title": "Below running peak"},
+        yaxis={"tickformat": fmt.PERCENT, "title": "Below running peak"},
         xaxis={"title": None},
         margin={"l": 64, "r": 40, "t": 56, "b": 40},
         height=height,
@@ -508,7 +713,7 @@ def decile_table(wide: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "Decile": [f"D{d}" for d in wide.columns],
-            "Mean %/month": [round(wide[d].mean() * 100, 3) for d in wide.columns],
+            "Mean %/month": [round(wide[d].mean() * 100, fmt.DECIMALS) for d in wide.columns],
             "Months": [int(wide[d].notna().sum()) for d in wide.columns],
         }
     )
@@ -534,9 +739,9 @@ def era_stats(wide: pd.DataFrame) -> list[tuple[str, str, str]]:
         tiles.append(
             (
                 label,
-                f"{window.mean() * 100:+.2f}%",
+                f"{window.mean() * 100:{fmt.SIGNED}}%",
                 # Two lines by design. One long line wraps unpredictably across four columns.
-                f"{note}<br>n {len(window)} · t {t_statistic:+.2f} · SR {sharpe:+.2f}",
+                f"{note}<br>n {len(window)} · t {t_statistic:{fmt.SIGNED}} · SR {sharpe:{fmt.SIGNED}}",
             )
         )
     return tiles

@@ -54,6 +54,8 @@ def load() -> pd.DataFrame:
 
 
 def frame(wide: pd.DataFrame, upto: pd.Timestamp, *, x_range: list[str], y_log_range: list[float]):
+    # The narrative beat, the mark landing the moment the reveal passes publication, is drawn
+    # by figures.py now. It used to be added here, which is why the app never had it.
     fan = figures.fig_decile_fan(
         wide,
         horizon_label="Prior 2 to 12 months",
@@ -61,28 +63,47 @@ def frame(wide: pd.DataFrame, upto: pd.Timestamp, *, x_range: list[str], y_log_r
         x_range=x_range,
         y_log_range=y_log_range,
         label_size=22,
+        published_year=PUBLISHED_YEAR,
     )
     fan.update_layout(title=None)
-
-    # The narrative beat: the marker lands the moment the reveal passes publication.
-    if upto.year >= PUBLISHED_YEAR:
-        fan.add_vline(
-            x=pd.Timestamp(f"{PUBLISHED_YEAR}-01-01").timestamp() * 1000,
-            line={"color": theme.LINE_STRONG, "width": 1, "dash": "dot"},
-            annotation_text="the paper is published",
-            annotation_position="top right",
-            annotation_font={"family": theme.FONT_BODY, "size": 19, "color": theme.FG_MUTED},
-        )
-
     return render.for_video(fan, title=TITLE, subtitle=str(upto.year), footer=FOOTER)
 
 
-def build(preview_year: int | None = None) -> int:
+def card(wide: pd.DataFrame, x_range: list[str], y_log_range: list[float]) -> int:
+    """The still the library index shows next to this paper.
+
+    Wide rather than square, and without the burned-in title the clip carries, because the
+    index sets its own type. It is committed, so the index does not depend on the video
+    pipeline being installed.
+    """
+    fan = figures.fig_decile_fan(
+        wide,
+        horizon_label="Prior 2 to 12 months",
+        x_range=x_range,
+        y_log_range=y_log_range,
+        show_title=False,
+        label_size=15,
+        published_year=PUBLISHED_YEAR,
+    )
+    # The end labels are the legend, so the right margin has to hold the longest of them
+    # ("Top decile · 16,908.30x") rather than the width that merely looks balanced.
+    fan.update_layout(margin={"l": 56, "r": 250, "t": 24, "b": 36}, height=460)
+    path = ROOT / "assets" / "previews" / f"{SLUG}-card.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fan.write_image(path, width=1000, height=460, scale=2)
+    print(f"wrote {path.relative_to(ROOT)} ({path.stat().st_size / 1024:.0f} KB)")
+    return 0
+
+
+def build(preview_year: int | None = None, card_only: bool = False) -> int:
     theme.register()
     wide = load()
     wealth = figures.wealth_curves(wide)
     y_log_range = figures.log_range(wealth)
     x_range = [wide.index[0].isoformat(), wide.index[-1].isoformat()]
+
+    if card_only:
+        return card(wide, x_range, y_log_range)
 
     final = wealth.iloc[-1]
     print(f"final value of one dollar: bottom decile {final[1]:,.3f}x, top decile {final[10]:,.0f}x")
@@ -128,5 +149,8 @@ def build(preview_year: int | None = None) -> int:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--preview", type=int, metavar="YEAR", help="render one frame and stop")
+    parser.add_argument(
+        "--card", action="store_true", help="write the still the library index shows, and stop"
+    )
     args = parser.parse_args()
-    sys.exit(build(args.preview))
+    sys.exit(build(args.preview, args.card))
