@@ -24,6 +24,12 @@ it from the source:
 uv run --group dev python -m papers.jegadeesh_titman_1993.build_data
 ```
 
+To screenshot the running app, which is the only way to judge layout:
+
+```bash
+uv run --group dev --group render python tools/shoot.py --out /tmp/shots --animate momentum-1993
+```
+
 To re-render the video and the GIF:
 
 ```bash
@@ -61,7 +67,16 @@ would fall over exactly when it matters. A test enforces this by taking sockets 
 
 **One source of visual truth.** `papers/<slug>/figures.py` serves both the app and the video.
 The video is never a screen recording, it is the same figures rendered offline, so it can be
-rebuilt at any time.
+rebuilt at any time. Figures are rendered with `theme=None`, otherwise Streamlit replaces
+their typography with its own and only the video keeps the house style.
+
+**Every control degrades, never raises.** An exception in a Streamlit page does not blank a
+chart, it blanks the page, and the standing disclaimer goes with it. The suite drives every
+control to its extremes and asserts the notice is still there.
+
+**The stack is pinned to what was tested.** pandas is held below 3, because 3.0.5 with
+pyarrow 25 segfaults the server on the third browser session, inside `pivot_table`, with no
+Python traceback.
 
 **LinkedIn does not animate GIFs.** An uploaded animated GIF is flattened to its first frame.
 The feed asset is a native MP4, square, muted, with labels burned in. The GIF above is a
@@ -75,7 +90,7 @@ of any Synerqo strategy, and not investment advice.
 
 | Paper | What you can turn |
 | --- | --- |
-| Jegadeesh and Titman (1993), *Returns to Buying Winners and Selling Losers* | The formation horizon, which flips the sign of the effect, and a ten year window you can drag through 2009 to watch the size and momentum tilt disappear |
+| Jegadeesh and Titman (1993), *Returns to Buying Winners and Selling Losers* | The formation horizon, which flips the sign of the effect. The weighting, where equal weighted reproduces the published 1.31 percent a month and value weighted reads 1.63. And a ten year window you can play or drag through 2009 to watch the size and momentum tilt disappear |
 
 ## Licence
 
