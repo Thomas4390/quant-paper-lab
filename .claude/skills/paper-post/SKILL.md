@@ -128,7 +128,34 @@ a grey smear where the fan should be. Diverging belongs to quantities that cross
 hex list and the surface. Its categorical checks do not apply to an ordered ramp, but its
 contrast column does, and that is the one that failed.
 
-**Format numbers at the precision the reader will check.** `,.0f` printed 1.5152 as `2x`.
+**One precision, everywhere a reader sees a number: two decimals.** It lives in
+`lab/format.py` — `NUMBER`, `SIGNED`, `PERCENT` for Plotly templates, `multiple()` for growth
+multiples — and every figure imports it rather than deciding for itself.
+
+| Where | Format | Reads as |
+| --- | --- | --- |
+| Growth multiple | `,.2f` + `x` | `1.52x`, `16,908.30x` |
+| Return in points | `+.2f` | `+1.63`, and `+1.63%` in a tile |
+| Anything already a fraction | `.2%` | `-78.49%` |
+| Axis ticks, colorbar ticks | same as the values they label | `10.00`, `-20.00%` |
+| t, Sharpe, skew | `+.2f` | `t +5.12 · SR +1.02` |
+
+The rule that produced it: `,.0f` printed 1.5152 as `2x`, a 32 percent overstatement. The fix
+was a cascade that picked a precision per magnitude, which was five conventions for the same
+quantity by the time three figures used it. A fixed two decimals cannot lose what that lesson
+was about, and can be checked without judgement. The cost is a trailing `.00` on a large
+number, which is the cheaper mistake. Published prose is out of scope: "34 percent" in a post
+is a sentence, not a readout.
+
+**Anything drawn belongs to `figures.py`, including the narrative marks.** The dotted line at
+publication was added by `animate.py`, so the video had it for a year and the app never did,
+under a module whose docstring calls itself the single source of visual truth. A mark is a
+parameter of the figure, and it withholds itself twice: outside the drawn range, where it
+would lie about the scale, and ahead of an animated reveal, where it would give away the beat.
+
+**A figure the page can draw and the export cannot is not checkable.** Passing pandas
+Timestamps as an axis range works in the browser and dies in `write_image`, which is exactly
+the step below that tells you to look at the figure. Normalise to strings inside `figures.py`.
 
 **Streamlit overwrites the figure theme unless told not to.** `st.plotly_chart(...)` defaults
 to `theme="streamlit"`, which replaces the typography of every figure with its own. The
@@ -149,18 +176,33 @@ An animation earns its place when the variable being animated cannot be seen any
 ten year window rolling through the century qualifies, because the third dimension is time. A
 curve redrawing itself does not, because the reader can already see the whole curve.
 
+**The exception, and its price.** A curve may animate if it **opens complete**. The reader who
+never presses play then gets the same chart as before, the motion is theirs to ask for, which
+is also how `prefers-reduced-motion` is honoured, and Play rewinds rather than resumes, so it
+always does something. What it is not allowed to do is show a nearly empty chart and wait.
+
 Technique, in the app: Plotly frames plus `updatemenus` and a `sliders` block. Play and scrub
 then happen entirely in the browser, with no Streamlit rerun and no server work per step. For
 a 5 by 5 surface, ninety frames cost about 84 KB.
 
 Traps, all real:
 
-- 3D traces need `redraw: True` in the frame args, or nothing updates.
+- 3D traces need `redraw: True` in the frame args, or nothing updates. So does any frame that
+  moves an annotation or a shape: those are layout, and a data-only redraw leaves them frozen.
 - Set the camera once on the base figure and never inside a frame, otherwise the view snaps
   back on every step.
 - Freeze `cmin`, `cmax` and the z range across all frames, and derive them from all frames.
+- **Send only what changes, and derive the frame count from a payload budget.** A curve's
+  frames scale with the window the reader chose, so a fixed count is a promise you cannot
+  keep: the same code was 435 KB over twenty five years and would have been 10 MB over a
+  century. Frames carry `y` alone, cut at the stop, as float32 — Plotly draws whichever of x
+  and y runs out first, so a short `y` is a reveal, at half the cost of padding the tail with
+  nulls and a quarter of resending the dates. Then thin the stops until they fit.
 - Style `updatemenus` and `sliders` explicitly. Their defaults ignore the template and land as
   white browser chrome on a graphite page.
+- Place the controls below the tick labels, not on them. Their `y` is a fraction of the
+  plotting area measured from its bottom edge, and the value that suits a 3D scene puts the
+  readout straight through a cartesian x axis.
 - Honour `prefers-reduced-motion` by not autoplaying. Let the reader press play.
 
 ## Step 8. Render the video, not a GIF
@@ -203,17 +245,41 @@ Then open the images. Use the same `uv` group set for the server and for the too
 aware that Streamlit scrolls inside its own container, so a full page capture needs a tall
 viewport rather than `full_page=True`.
 
-**Pin the stack that the deployment will run.** pandas 3.0.5 with pyarrow 25 segfaulted the
-server on the third browser session, inside `pivot_table`, with no Python traceback. Found
-only by loading the page repeatedly. `PYTHONFAULTHANDLER=1` gives the native trace. The app
-gains nothing from the newest major, and a public page that dies on the third visitor is not a
-page. Pinned to pandas 2.
+**A native crash is invisible to the test suite.** pyarrow 25 defaults to the mimalloc memory
+pool, and Streamlit serialising a dataframe on it segfaults the server inside
+`convert_arrow_table_to_arrow_bytes`, usually on the first page load. No Python traceback, no
+failing test, no error in the browser: the process is gone and every connected session with
+it. `PYTHONFAULTHANDLER=1` gives the native trace and names the thread.
+
+Three things this cost, worth not paying twice:
+
+- **The suite cannot see it, and neither can `AppTest`.** Twelve `AppTest` runs of the same
+  page were clean, and so were twenty conversions on a fresh thread. It needs a real server, a
+  real websocket and a real rerun per click, which is what `tools/soak.py` drives.
+- **Change one variable and keep a control.** The pool was confirmed by toggling
+  `ARROW_DEFAULT_MEMORY_POOL` alone: 3 segfaults out of 3 on mimalloc, 0 out of 3 on `system`
+  and on `jemalloc`. An earlier round of this looked flaky at 1 out of 3 purely because the
+  ports collided, which is the sort of noise that gets a real bug filed as intermittent.
+- **A pin that fixed a segfault did not fix segfaults.** pandas 3.0.5 had been blamed for an
+  earlier crash, in a different frame inside `pivot_table`, and pinned away. With that pin in
+  force and pandas 2.3.3 installed, the server still died, now in the Arrow IPC writer. Two
+  native crashes, one symptom. Whether the allocator was behind both is untested and should be
+  stated as such rather than assumed.
+- **The obvious in-process fix does not work.** `pyarrow.set_memory_pool()` really does move
+  `default_memory_pool()`, and the segfault survives it 3 times out of 3, because the IPC
+  writer allocates through Arrow's C++ default, which is fixed when the shared library
+  initialises. Only the environment variable works, and only because Streamlit imports pyarrow
+  lazily, which leaves the entry point early enough to set it. Check the fix, not the theory.
+
+Verify a fix by re-measuring, not by reasoning: `uv run --group dev python tools/soak.py` and
+the same command with `--pool mimalloc` to prove the harness can still catch it.
 
 ## Step 11. Pre-flight
 
 Nothing ships until all of this is true:
 
 - [ ] `uv run --group dev pytest -q` green
+- [ ] `uv run --group dev python tools/soak.py` survives, no signal
 - [ ] every claim in the post traced to `paper.yaml`, and every claim visible in the app
 - [ ] intervals, n and t published next to every headline number
 - [ ] cost sensitivity stated

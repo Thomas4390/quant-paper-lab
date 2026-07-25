@@ -74,9 +74,16 @@ their typography with its own and only the video keeps the house style.
 chart, it blanks the page, and the standing disclaimer goes with it. The suite drives every
 control to its extremes and asserts the notice is still there.
 
-**The stack is pinned to what was tested.** pandas is held below 3, because 3.0.5 with
-pyarrow 25 segfaults the server on the third browser session, inside `pivot_table`, with no
-Python traceback.
+**Arrow runs on a pool that does not crash.** pyarrow 25 defaults to mimalloc, and Streamlit
+serialising a dataframe on it kills the whole server with SIGSEGV, no Python traceback,
+usually on the first page load. `lab/arrow.py` sets `ARROW_DEFAULT_MEMORY_POOL` before pyarrow
+loads, which is the only lever that works: `pyarrow.set_memory_pool()` moves the Python
+default and the crash survives it. Re-measure with `tools/soak.py --pool mimalloc`. pandas is
+also held below 3, from an earlier segfault with a different native trace, inside
+`pivot_table`; that pin stays until pandas 3 is tested on purpose.
+
+**One precision for every number on screen.** Two decimals, from `lab/format.py`: hovers,
+annotations, tiles, tables and axis ticks. Published prose keeps its own writing.
 
 **LinkedIn does not animate GIFs.** An uploaded animated GIF is flattened to its first frame.
 The feed asset is a native MP4, square, muted, with labels burned in. The GIF above is a
@@ -90,7 +97,7 @@ of any Synerqo strategy, and not investment advice.
 
 | Paper | What you can turn |
 | --- | --- |
-| Jegadeesh and Titman (1993), *Returns to Buying Winners and Selling Losers* | The formation horizon, which flips the sign of the effect. The weighting, where equal weighted reproduces the published 1.31 percent a month and value weighted reads 1.63. And a ten year window you can play or drag through 2009 to watch the size and momentum tilt disappear |
+| Jegadeesh and Titman (1993), *Returns to Buying Winners and Selling Losers* | The formation horizon, which flips the sign of the effect. The weighting, where equal weighted reproduces the published 1.31 percent a month and value weighted reads 1.63. A fan you can play, watching one dollar split into ten deciles and the mark land as the window passes publication. And a ten year window you can play or drag through 2009 to watch the size and momentum tilt disappear |
 
 ## Licence
 
