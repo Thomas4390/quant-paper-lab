@@ -1,12 +1,28 @@
 # Synerqo surface. Dark ships by default, emerald is the single accent.
 # Hex values mirror lab/theme.py, which is the source of truth for anything that draws.
+#
+# Fonts are declared here rather than in injected CSS. A rule in an injected stylesheet loses
+# the cascade to Streamlit's own class selectors, and because webfonts load lazily, a family
+# that never wins a rule is never downloaded at all. That is how Playfair silently never
+# appeared anywhere on the page.
 [theme]
 base = "dark"
 backgroundColor = "#0D0F12"
 secondaryBackgroundColor = "#15171A"
 textColor = "#EFF3F8"
 primaryColor = "#00C896"
-font = "sans serif"
+
+font = "DM Sans:https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&display=swap, Inter, sans-serif"
+headingFont = "Playfair Display:https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500&display=swap, Georgia, serif"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap, monospace"
+headingFontWeights = [500, 500, 500]
 
 [browser]
 gatherUsageStats = false
+
+[client]
+# This app is public. A traceback in the browser would ship absolute server paths and the
+# dependency tree to anyone who trips an error, so failures stay in the server log.
+showErrorDetails = "none"
+# Hide the developer toolbar. Visitors arrive from a post, not from a deploy button.
+toolbarMode = "minimal"

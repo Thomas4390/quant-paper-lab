@@ -1,18 +1,25 @@
 """Synerqo visual identity, declared once for both the app and the rendered video.
 
 Colors are the brand's canonical hex seeds (see the synerqo-brand skill and synerqo.com).
-The brand authors in OKLCH, so each value carries its OKLCH origin in a comment. Hex is
-what Plotly and the headless renderer actually consume.
+The brand authors in OKLCH, so each value carries its OKLCH origin in a comment. Hex is what
+Plotly and the headless renderer actually consume.
 
-Every figure in this repo must go through PLOTLY_TEMPLATE. That is what keeps the app and
-the MP4 frames from drifting apart.
+Every figure in this repo must go through PLOTLY_TEMPLATE, and every figure must be rendered
+with `theme=None`. Streamlit's default is to overwrite a figure's typography with its own,
+which silently neutralises everything below.
+
+Fonts are declared in .streamlit/config.toml, not here. A CSS rule injected into the page
+loses the cascade to Streamlit's own class selectors, and because webfonts load lazily, a
+family that never wins a rule is never even downloaded.
 
 Color policy, in short:
   Emerald carries identity and stays under 10 percent of the chrome.
   Full-spectrum color is allowed only when it encodes data. Here that means one diverging
-  scale, amber for negative through neutral gray to emerald for positive. The pair was
-  validated for color-vision deficiency (deuteranopia dE 13.1, floor 8) so the polarity
-  survives without relying on red versus green.
+  scale for signed quantities, validated for colour-vision deficiency (deuteranopia dE 13.1
+  against a floor of 8) so polarity never rests on red against green.
+  Rank is ordered, not signed, so it takes a single-hue ramp. Using the diverging scale for
+  decile rank put four of the ten lines under 3:1 against the background and made two of them
+  the same lightness.
 """
 
 from __future__ import annotations
@@ -37,10 +44,34 @@ NEGATIVE = "#FF7C00"  # oklch(0.780 0.250 56), the brand thermal ramp at 0.86
 #: Diverging scale for any quantity that can flip sign. Always pass cmid=0 with it.
 DIVERGING = [[0.0, NEGATIVE], [0.5, LINE_STRONG], [1.0, ACCENT]]
 
+#: Single-hue ramp for ordered ranks, dark to light at hue 165. Every step clears 3:1
+#: against the graphite surface, from 3.8:1 to 11.3:1, and lightness rises monotonically.
+RANK_RAMP = [
+    "#377E62",
+    "#3A8A6B",
+    "#3D9674",
+    "#3FA27D",
+    "#42AF86",
+    "#45BB8F",
+    "#47C899",
+    "#49D5A2",
+    "#4CE2AC",
+]
+
+# --- Rhythm -----------------------------------------------------------------------
+# Three spacing steps, not two. Before this the page only ever used 0 or 16 pixels, so the
+# gap between two sections read the same as the gap between a figure and its own caption.
+SPACE_SECTION = 60
+SPACE_BLOCK = 24
+SPACE_TIGHT = 8
+
+#: Prose measure, in characters so it holds at any window width. One value for every text
+#: block on the page, otherwise the left edge is straight and the right edge is a staircase.
+MEASURE = "68ch"
+
 # --- Type -------------------------------------------------------------------------
-# Google Fonts are loaded by inject_css() for the browser. The headless renderer used for
-# video frames falls back to the next family in the stack when a font is not installed
-# system wide, which is why every stack ends in a widely available face.
+# Names only. The files are loaded by .streamlit/config.toml, which is the only place that
+# wins the cascade against Streamlit's own stylesheet.
 FONT_BODY = "DM Sans, Inter, Helvetica Neue, Arial, sans-serif"
 FONT_DISPLAY = "Playfair Display, Georgia, serif"
 FONT_MONO = "JetBrains Mono, DejaVu Sans Mono, Menlo, monospace"
@@ -75,7 +106,7 @@ def _scene_axis(title: str) -> dict:
         "showbackground": True,
         "gridcolor": LINE,
         "zerolinecolor": LINE_STRONG,
-        "tickfont": {"family": FONT_MONO, "size": 10, "color": FG_SUBTLE},
+        "tickfont": {"family": FONT_MONO, "size": 11, "color": FG_SUBTLE},
     }
 
 
@@ -85,8 +116,11 @@ def scene(x_title: str, y_title: str, z_title: str) -> dict:
         "xaxis": _scene_axis(x_title),
         "yaxis": _scene_axis(y_title),
         "zaxis": _scene_axis(z_title),
-        "camera": {"eye": {"x": 1.55, "y": -1.65, "z": 0.85}},
-        "aspectratio": {"x": 1, "y": 1, "z": 0.62},
+        "camera": {"eye": {"x": 1.15, "y": -1.3, "z": 0.5}},
+        "aspectratio": {"x": 1.15, "y": 1.15, "z": 0.9},
+        # Preserve the camera across frames and across Streamlit reruns. Without it every
+        # animation frame snaps the viewpoint back and the reader cannot orbit while playing.
+        "uirevision": "synerqo-scene",
     }
 
 
@@ -98,7 +132,8 @@ def register() -> None:
             "plot_bgcolor": BG,
             "font": {"family": FONT_BODY, "size": 14, "color": FG},
             "title": {
-                "font": {"family": FONT_DISPLAY, "size": 20, "color": FG},
+                # Body face, not the display face. A serif on a chart title is decoration.
+                "font": {"family": FONT_BODY, "size": 17, "color": FG},
                 "x": 0,
                 "xanchor": "left",
                 "pad": {"b": 12},
@@ -122,6 +157,7 @@ def register() -> None:
                 "font": {"family": FONT_MONO, "size": 12, "color": FG},
             },
             "margin": {"l": 64, "r": 24, "t": 56, "b": 48},
+            "uirevision": "synerqo",
         }
     )
     pio.templates.default = _TEMPLATE_NAME
@@ -129,8 +165,6 @@ def register() -> None:
 
 CSS = f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Playfair+Display:wght@500&family=JetBrains+Mono:wght@400&display=swap');
-
 :root {{
   --bg: {BG};
   --bg-elevated: {BG_ELEVATED};
@@ -139,41 +173,60 @@ CSS = f"""
   --fg-muted: {FG_MUTED};
   --fg-subtle: {FG_SUBTLE};
   --accent: {ACCENT};
+  --measure: {MEASURE};
 }}
 
-html, body, [class*="css"] {{ font-family: {FONT_BODY}; }}
-h1, h2, h3 {{ font-family: {FONT_DISPLAY}; font-weight: 500; letter-spacing: 0; }}
-code, pre, .stMetricValue {{ font-family: {FONT_MONO}; font-variant-numeric: tabular-nums; }}
+/* Streamlit leaves a deep gutter above the first block. Pull it back so the opening figure
+   reaches the fold. */
+.stMainBlockContainer {{ padding-top: 3.2rem; }}
 
-/* The eyebrow above a section title. Uppercase, subtle, never emerald. */
+/* Micro label: tile headings, page kicker. Deliberately quiet. */
 .eyebrow {{
-  font-family: {FONT_BODY};
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: {FG_SUBTLE};
 }}
 
+/* Structural label: the only marker of where one section ends and the next begins, so it
+   carries a rule and a stronger ink than a tile heading. */
+.section-eyebrow {{
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: {FG_MUTED};
+  border-top: 1px solid {LINE};
+  padding-top: 14px;
+}}
+
+.citation, .disclaimer, .measured {{ max-width: var(--measure); }}
+
 .citation {{
   border-left: 2px solid {ACCENT};
   padding: 2px 0 2px 14px;
   color: {FG_MUTED};
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.65;
 }}
 
 .disclaimer {{
   border-top: 1px solid {LINE};
-  margin-top: 40px;
+  margin-top: 44px;
   padding-top: 16px;
   color: {FG_SUBTLE};
   font-size: 12px;
   line-height: 1.7;
 }}
 
+/* The slider rail was the most saturated block on the page, in the same emerald that means
+   "top decile" two hundred pixels above. Rail neutral, handle emerald. */
+[data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {{ background: {ACCENT}; }}
+
 /* Focus ring: 2px emerald at 2px offset, on every interactive element. */
 *:focus-visible {{ outline: 2px solid {ACCENT}; outline-offset: 2px; }}
 
+/* Reduced motion only reaches CSS. Plotly animates in JavaScript, which is why nothing on
+   this page autoplays: motion starts when the reader presses play. */
 @media (prefers-reduced-motion: reduce) {{
   * {{ animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }}
 }}
@@ -182,7 +235,7 @@ code, pre, .stMetricValue {{ font-family: {FONT_MONO}; font-variant-numeric: tab
 
 
 def inject_css() -> None:
-    """Load brand fonts and CSS tokens into the Streamlit page."""
+    """Load the CSS tokens into the Streamlit page. Fonts come from config.toml."""
     import streamlit as st
 
     st.markdown(CSS, unsafe_allow_html=True)
