@@ -116,8 +116,16 @@ def scene(x_title: str, y_title: str, z_title: str) -> dict:
         "xaxis": _scene_axis(x_title),
         "yaxis": _scene_axis(y_title),
         "zaxis": _scene_axis(z_title),
-        "camera": {"eye": {"x": 1.15, "y": -1.3, "z": 0.5}},
-        "aspectratio": {"x": 1.15, "y": 1.15, "z": 0.9},
+        # Negative x, so the first category of the x axis sits on the left and the last on the
+        # right, the way a reader expects to be told a story. From the positive side the axis
+        # ran away into the screen and the whole scene read as if seen from behind.
+        "camera": {"eye": {"x": -0.85, "y": -1.55, "z": 0.48}},
+        # A 3D axis title is drawn outside the box, and Plotly reserves no room for it: at
+        # 1.15 the x title was cut to "Prio" in the app while rendering whole at twice the
+        # size, which is why a static export never showed it. 0.95 keeps the whole label
+        # inside a 560 pixel panel, and the z over x ratio is unchanged, so the relief that
+        # makes a point a month legible is exactly as tall as before.
+        "aspectratio": {"x": 0.95, "y": 0.95, "z": 0.74},
         # Preserve the camera across frames and across Streamlit reruns. Without it every
         # animation frame snaps the viewpoint back and the reader cannot orbit while playing.
         "uirevision": "synerqo-scene",

@@ -179,7 +179,22 @@ lazily, a family that never wins a rule is never even downloaded. Playfair was a
 every heading for exactly that reason, with no error anywhere. Verify in the browser with
 `document.fonts.check(...)`, not by reading the CSS.
 
-**Look at the figure.** Export a PNG and open it. Do not judge a chart from its code.
+**A 3D camera decides which way the story reads.** The sign of `camera.eye.x` puts the first
+category of the x axis on the left or on the right. On the wrong side the axis runs away into
+the screen, the page says "losers on the left, winners on the right" while the figure says
+something else, and the whole scene reads as if the reader were standing behind it. Set the
+eye so the axis you are narrating runs left to right, then move it toward the front until the
+second dimension is still legible as depth. Fully face on is not the goal: it flattens the
+dimension that earned the third axis.
+
+**Look at the figure, at the size the app draws it.** Export a PNG and open it, but a big
+export hides everything that clips. A 3D axis title is drawn outside the box with no room
+reserved for it, so "Prior return" rendered whole at 1600 pixels and read "Prio" in the app.
+`aspectratio` is the lever that works, `margin` is not, because the need is a fixed number of
+pixels while a domain fraction buys fewer of them the narrower the panel gets. Below roughly
+800 pixels one of the three titles clips whatever you do. Check the narrow width on purpose
+rather than the one your window happens to be, and say where the limit is instead of
+pretending there is none.
 
 ## Step 7. Animate only where time is the point
 

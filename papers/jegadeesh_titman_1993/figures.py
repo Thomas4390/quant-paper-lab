@@ -544,7 +544,11 @@ def _surface(matrix: np.ndarray, bounds: tuple[float, float], show_colorbar: boo
 
 def _scene(bounds: tuple[float, float]) -> dict:
     scene = theme.scene("Prior return", "Size", "Tilt")
-    scene["domain"] = {"x": [0.02, 0.9], "y": [0.0, 1.0]}
+    # Starting at 0.02 pushed the box against the left edge once the camera moved to the far
+    # side, and took the z ticks with it. Below roughly 800 pixels of panel a 3D axis title
+    # still clips, because Plotly reserves no room for one and a fraction buys fewer pixels
+    # the narrower the container gets.
+    scene["domain"] = {"x": [0.14, 0.90], "y": [0.0, 1.0]}
     scene["xaxis"] |= {"tickmode": "array", "tickvals": list(range(1, 6)), "ticktext": PRIOR_TICKS}
     scene["yaxis"] |= {"tickmode": "array", "tickvals": list(range(1, 6)), "ticktext": SIZE_TICKS}
     # tickformat governs the ticks, hoverformat governs the hover label, and setting only the
@@ -556,11 +560,8 @@ def _scene(bounds: tuple[float, float]) -> dict:
         "tickformat": fmt.NUMBER,
         "hoverformat": fmt.PLAIN,
     }
-    # Taller relief and a closer eye than the default, because the whole point of the third
-    # dimension here is a difference of about a point a month, and a 3D scene left to itself
-    # sits small in the middle of a wide container.
-    
-    scene["camera"] = {"eye": {"x": 1.15, "y": -1.3, "z": 0.5}}
+    # The camera and the relief come from theme.scene. They used to be restated here with the
+    # same numbers, which is two places to change and one of them to forget.
     return scene
 
 
