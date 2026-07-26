@@ -28,6 +28,11 @@ NUMBER = f",.{DECIMALS}f"
 SIGNED = f"+.{DECIMALS}f"
 PERCENT = f".{DECIMALS}%"
 
+#: No sign flag, no grouping flag. A 3D scene axis silently rejects `+.2f` in `hoverformat`
+#: and falls back to the raw double, which is how a tooltip came to read
+#: -0.47932119658119654. Plotly draws the minus itself, so nothing is lost.
+PLAIN = f".{DECIMALS}f"
+
 
 def multiple(value: float) -> str:
     """A growth multiple, as the reader will check it: `1.52x`, `16,908.30x`."""

@@ -521,10 +521,11 @@ def _surface(matrix: np.ndarray, bounds: tuple[float, float], show_colorbar: boo
         cmax=bounds[1],
         lighting={"ambient": 0.9, "diffuse": 0.3, "specular": 0.03, "roughness": 1.0},
         contours={"z": {"show": True, "color": theme.LINE, "width": 1, "usecolormap": False}},
-        hovertemplate=(
-            f"size Q%{{y}} · prior Q%{{x}}<br>%{{z:{fmt.SIGNED}}} points vs window average"
-            "<extra></extra>"
-        ),
+        # No format spec on %{z}, and no literal Q. A 3D surface resolves both through its
+        # scene axes before the template runs: the spec is dropped, so `:+.2f` printed
+        # -0.47932119658119654, and %{x} already carries the axis ticktext, so a "Q" in front
+        # of it printed QQ1. Precision now comes from zaxis.hoverformat in _scene.
+        hovertemplate="size %{y} · prior %{x}<br>%{z} points vs window average<extra></extra>",
         showscale=show_colorbar,
         colorbar={
             "title": {
@@ -546,7 +547,15 @@ def _scene(bounds: tuple[float, float]) -> dict:
     scene["domain"] = {"x": [0.02, 0.9], "y": [0.0, 1.0]}
     scene["xaxis"] |= {"tickmode": "array", "tickvals": list(range(1, 6)), "ticktext": PRIOR_TICKS}
     scene["yaxis"] |= {"tickmode": "array", "tickvals": list(range(1, 6)), "ticktext": SIZE_TICKS}
-    scene["zaxis"] |= {"range": list(bounds), "dtick": 0.5, "tickformat": fmt.NUMBER}
+    # tickformat governs the ticks, hoverformat governs the hover label, and setting only the
+    # first leaves the tooltip printing a raw double. fmt.PLAIN rather than fmt.SIGNED here:
+    # the sign flag is what a scene axis rejects.
+    scene["zaxis"] |= {
+        "range": list(bounds),
+        "dtick": 0.5,
+        "tickformat": fmt.NUMBER,
+        "hoverformat": fmt.PLAIN,
+    }
     # Taller relief and a closer eye than the default, because the whole point of the third
     # dimension here is a difference of about a point a month, and a 3D scene left to itself
     # sits small in the middle of a wide container.

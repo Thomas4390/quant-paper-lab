@@ -147,6 +147,17 @@ was about, and can be checked without judgement. The cost is a trailing `.00` on
 number, which is the cheaper mistake. Published prose is out of scope: "34 percent" in a post
 is a sentence, not a readout.
 
+**A tooltip is not covered by the format you set on the axis, and a screenshot cannot see
+it.** Three separate attributes decide what a reader reads: the template spec, `tickformat`
+and `hoverformat`. On a 3D surface, `%{z:+.2f}` is **dropped**, and the tooltip printed
+`-0.47932119658119654 points`. Moving the precision to `scene.zaxis.hoverformat` fixes it,
+but only without a sign flag: `+.2f` there is silently rejected and falls back to the same
+raw double. `%{x}` also already carries the axis `ticktext`, so a literal `Q` in front of it
+prints `QQ1`. None of this is visible in the figure spec or in a still, so read the hover in
+a browser: write the figure to a standalone HTML with `include_plotlyjs=True`, drive it with
+Playwright, and print `.hovertext tspan`. Cartesian traces were fine, which is exactly why
+it went unnoticed.
+
 **Anything drawn belongs to `figures.py`, including the narrative marks.** The dotted line at
 publication was added by `animate.py`, so the video had it for a year and the app never did,
 under a module whose docstring calls itself the single source of visual truth. A mark is a

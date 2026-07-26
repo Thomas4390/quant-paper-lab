@@ -226,6 +226,26 @@ def test_stat_tiles_accept_an_empty_row() -> None:
 # --------------------------------------------------------------- the surface window
 
 
+def test_the_surface_tooltip_is_formatted_by_the_axis_not_by_the_template() -> None:
+    """A 3D surface resolves %{z} through its scene axis, and drops the template's spec.
+
+    Left to `%{z:+.2f}` the tooltip printed -0.47932119658119654. Both halves of the fix are
+    load bearing and neither is visible in a screenshot: the axis has to carry hoverformat,
+    and that format cannot start with a sign flag, which a scene axis silently rejects by
+    falling back to the raw double.
+    """
+    dates, cube = data.size_prior_cube()
+    fig = figures.fig_size_prior_animation(dates, cube, bounds=figures.tilt_bounds(dates, cube))
+
+    hoverformat = fig.layout.scene.zaxis.hoverformat
+    assert hoverformat, "without hoverformat the tooltip prints a raw double"
+    assert not hoverformat.startswith("+"), "a scene axis rejects the sign flag and gives up"
+
+    template = fig.data[0].hovertemplate
+    assert "%{z:" not in template, "a format spec on %{z} is dropped rather than applied"
+    assert "Q%{" not in template, "%{x} already carries the axis ticktext, so a Q prefix doubles it"
+
+
 def test_a_ten_year_window_is_ten_years() -> None:
     """The displayed window was 132 months while the label said ten years."""
     dates, cube = data.size_prior_cube()
